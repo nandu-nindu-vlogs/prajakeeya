@@ -1,0 +1,18 @@
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# SQLite DB — regenerated from seed on every deploy
+server/prajakeeya.db
+server/*.db
+
+# Build output (Render builds it)
+client/dist/
+
+# Env / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
