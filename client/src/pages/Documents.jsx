@@ -155,6 +155,30 @@ export default function Documents() {
         <Alert severity={msg.type} sx={{ mb: 3 }} onClose={() => setMsg(null)}>{msg.text}</Alert>
       )}
 
+      <Card sx={{ mb: 4, border: `1px solid ${alpha('#10B981', 0.16)}`, bgcolor: alpha('#10B981', 0.03) }}>
+        <CardContent sx={{ p: 2.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: NAVY }}>Eligibility checklist</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Review the required proof and supporting details before applying for a certificate.
+          </Typography>
+          <Grid container spacing={2}>
+            {[
+              ['Income Certificate', 'Annual household income, Aadhaar, and address proof'],
+              ['Caste Certificate', 'Community certificate details and supporting government records'],
+              ['Domicile Certificate', 'Residence proof and local address details'],
+              ['Scheme Eligibility', 'Scheme name and relevant eligibility details'],
+            ].map(([label, hint]) => (
+              <Grid item xs={12} sm={6} key={label}>
+                <Box sx={{ p: 1.5, bgcolor: 'white', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>{label}</Typography>
+                  <Typography variant="caption" color="text.secondary">{hint}</Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
+
       {/* Available types */}
       <Typography variant="overline" sx={{ color: '#64748B', fontWeight: 700, mb: 2, display: 'block' }}>
         AVAILABLE CERTIFICATES

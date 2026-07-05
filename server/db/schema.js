@@ -239,17 +239,47 @@ function initSchema() {
   `);
 }
 
+function rebuildTablesWithLegacyUserReference() {
+  const tables = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL AND sql LIKE '%users_old%'").all();
+  if (!tables.length) return;
+
+  console.log('[MIGRATE] Rebuilding tables that still reference legacy users_old table...');
+  const originalForeignKeys = db.pragma('foreign_keys');
+  db.pragma('foreign_keys = OFF');
+
+  try {
+    for (const { name, sql } of tables) {
+      const tempName = `${name}_new`;
+      const rebuiltSql = sql.replace(/CREATE TABLE\s+"?\w+"?\s*\(/i, `CREATE TABLE ${tempName} (`).replace(/users_old/g, 'users');
+      db.exec(rebuiltSql);
+      db.exec(`INSERT INTO ${tempName} SELECT * FROM ${name}`);
+      db.exec(`DROP TABLE ${name}`);
+      db.exec(`ALTER TABLE ${tempName} RENAME TO ${name}`);
+      console.log(`[MIGRATE] Rebuilt ${name}`);
+    }
+  } finally {
+    db.pragma(`foreign_keys = ${originalForeignKeys}`);
+  }
+}
+
 function runMigrations() {
+  rebuildTablesWithLegacyUserReference();
+
   // Migration: rebuild users table if it doesn't support 'contractor' role
-  // (old DB has CHECK without contractor)
+  // (old DB has a CHECK constraint that excludes contractor)
   try {
     const info = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
-    if (info && !info.sql.includes("'contractor'")) {
+    if (!info) {
+      const legacy = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'").get();
+      if (legacy) {
+        console.log('[MIGRATE] Restoring users table from users_old...');
+        db.exec('ALTER TABLE users_old RENAME TO users');
+      }
+    } else if (!info.sql.includes("'contractor'")) {
       console.log('[MIGRATE] Upgrading users table to support contractor role...');
       db.exec(`
-        ALTER TABLE users RENAME TO users_old;
-
-        CREATE TABLE users (
+        DROP TABLE IF EXISTS users_new;
+        CREATE TABLE users_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL, name_kn TEXT,
           email TEXT UNIQUE NOT NULL,
@@ -260,15 +290,24 @@ function runMigrations() {
           is_active INTEGER DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-
-        INSERT INTO users SELECT * FROM users_old;
-        DROP TABLE users_old;
+        INSERT INTO users_new (id, name, name_kn, email, password_hash, role, aadhaar_id, dept_id, is_active, created_at)
+        SELECT id, name, name_kn, email, password_hash, role, aadhaar_id, dept_id, is_active, created_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
       `);
       console.log('[MIGRATE] users table upgraded.');
     }
   } catch(e) {
     console.error('[MIGRATE] users migration error:', e.message);
   }
+
+  // Remove stale backup table if present from a previous failed migration.
+  try {
+    const legacy = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'").get();
+    if (legacy) {
+      db.exec('DROP TABLE users_old');
+    }
+  } catch(_) {}
 
   // Migration: ensure new tables exist (for existing DBs)
   // contractor_profiles, projects, project_updates, project_objections

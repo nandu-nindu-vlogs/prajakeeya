@@ -58,11 +58,43 @@ export default function CitizenDashboard() {
   const [files, setFiles] = useState([]);
   const [docs, setDocs] = useState([]);
   const [grievances, setGrievances] = useState([]);
+  const [timelineItems, setTimelineItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([getFiles(), getMyDocuments(), getGrievances()])
-      .then(([f, d, g]) => { setFiles(f.data); setDocs(d.data); setGrievances(g.data); })
+      .then(([f, d, g]) => {
+        setFiles(f.data);
+        setDocs(d.data);
+        setGrievances(g.data);
+        const activity = [
+          ...f.data.slice(0, 4).map(item => ({
+            kind: 'application',
+            title: item.title,
+            subtitle: `${item.category} • ${new Date(item.created_at).toLocaleDateString('en-IN')}`,
+            status: item.status,
+            date: item.created_at,
+            icon: <FolderOpen fontSize="small" />,
+          })),
+          ...d.data.slice(0, 3).map(item => ({
+            kind: 'document',
+            title: item.meta?.label || 'Certificate',
+            subtitle: item.cert_number || 'Instant document issued',
+            status: item.status || 'active',
+            date: item.issued_at,
+            icon: <Description fontSize="small" />,
+          })),
+          ...g.data.slice(0, 3).map(item => ({
+            kind: 'grievance',
+            title: item.subject,
+            subtitle: `${item.ticket_id} • ${item.category}`,
+            status: item.status,
+            date: item.created_at,
+            icon: <Campaign fontSize="small" />,
+          })),
+        ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+        setTimelineItems(activity);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -99,6 +131,37 @@ export default function CitizenDashboard() {
           File Grievance
         </Button>
       </Box>
+
+      <Card sx={{ mb: 4, border: `1px solid ${alpha('#0D1B2A', 0.08)}` }}>
+        <CardContent sx={{ p: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Activity timeline</Typography>
+              <Typography variant="caption" sx={{ color: '#64748B' }}>Recent activity across applications, documents, and grievances</Typography>
+            </Box>
+            <Chip label="Live updates" size="small" sx={{ bgcolor: alpha('#0D1B2A', 0.06), color: NAVY, fontWeight: 700 }} />
+          </Box>
+          {timelineItems.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No recent activity yet — start with a new application.</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {timelineItems.map((item, idx) => (
+                <Box key={`${item.kind}-${idx}`} sx={{ display: 'flex', gap: 1.5, p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2 }}>
+                  <Avatar sx={{ bgcolor: alpha(NAVY, 0.08), color: NAVY, width: 34, height: 34 }}>{item.icon}</Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>{item.title}</Typography>
+                      <StatusChip status={item.status} />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.25 }}>{item.subtitle}</Typography>
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>{new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
 
       {/* KPIs */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>

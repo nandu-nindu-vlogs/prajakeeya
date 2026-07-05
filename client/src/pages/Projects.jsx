@@ -177,6 +177,21 @@ function ProjectDetailDialog({ project, open, onClose }) {
           <>
             {/* Key Info */}
             <Box sx={{ p: 3, borderBottom: '1px solid #F1F5F9' }}>
+              <Card sx={{ mb: 2, bgcolor: alpha('#0891B2', 0.04), border: `1px solid ${alpha('#0891B2', 0.16)}` }}>
+                <CardContent sx={{ p: 2.2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: NAVY, mb: 1 }}>Milestone progress</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Next visible milestone target: every 2 weeks for active work and monthly review for completed phases.
+                  </Typography>
+                  <Box sx={{ mt: 1.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">Current progress</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: sc.color }}>{project?.completion_pct}%</Typography>
+                    </Box>
+                    <LinearProgress variant="determinate" value={project?.completion_pct || 0} sx={{ height: 8, borderRadius: 999, bgcolor: alpha(sc.color, 0.12), '& .MuiLinearProgress-bar': { bgcolor: sc.color, borderRadius: 999 } }} />
+                  </Box>
+                </CardContent>
+              </Card>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>

@@ -62,6 +62,7 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use((err, req, res, next) => {
   console.error('[API ERROR]', req.method, req.path, '-', err.message);
+  console.error(err.stack);
   if (!res.headersSent) {
     res.status(500).json({ error: 'Internal server error', detail: err.message });
   }

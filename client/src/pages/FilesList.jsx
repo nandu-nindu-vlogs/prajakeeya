@@ -3,7 +3,7 @@ import {
   Box, Card, CardContent, Typography, Chip, Stack, Button,
   TextField, InputAdornment, Select, MenuItem, FormControl,
   InputLabel, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Avatar, CircularProgress, alpha
+  TableHead, TableRow, Avatar, CircularProgress, alpha, Grid
 } from '@mui/material';
 import { Search, FolderOpen, ArrowForward, FilterList } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -97,72 +97,63 @@ export default function FilesList() {
           <Typography variant="h6" color="text.secondary">No files found</Typography>
         </Box>
       ) : (
-        <Card>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>File</TableCell>
-                  <TableCell>Department</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>SLA</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Date</TableCell>
-                  <TableCell></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filtered.map(f => {
-                  const sla = getSlaStatus(f);
-                  const sc = STATUS_COLORS[f.status] || STATUS_COLORS.submitted;
-                  return (
-                    <TableRow key={f.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/files/${f.id}`)}>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: NAVY }}>{f.title}</Typography>
-                          <Typography variant="caption" color="text.secondary">{f.category} · #{f.id}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{f.dept_name || '—'}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={f.status.replace('_', ' ')} size="small"
-                          sx={{ bgcolor: sc.bg, color: sc.color, fontWeight: 700, border: `1px solid ${sc.color}33` }} />
-                      </TableCell>
-                      <TableCell>
+        <Grid container spacing={2.5}>
+          {filtered.map(f => {
+            const sla = getSlaStatus(f);
+            const sc = STATUS_COLORS[f.status] || STATUS_COLORS.submitted;
+            return (
+              <Grid item xs={12} md={6} key={f.id}>
+                <Card sx={{ height: '100%', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { boxShadow: 6, transform: 'translateY(-2px)' } }} onClick={() => navigate(`/files/${f.id}`)}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: NAVY }}>{f.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">{f.category} · #{f.id}</Typography>
+                      </Box>
+                      <Chip label={f.status.replace('_', ' ')} size="small"
+                        sx={{ bgcolor: sc.bg, color: sc.color, fontWeight: 700, border: `1px solid ${sc.color}33` }} />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {f.dept_name || 'Department will be assigned shortly'}
+                    </Typography>
+                    <Stack spacing={1.2} sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">Application progress</Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: sc.color }}>
+                          {f.status === 'approved' ? 'Completed' : f.status === 'rejected' ? 'Needs attention' : 'In progress'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">Expected timeline</Typography>
                         {sla ? (
-                          <Box>
-                            {sla.breached ? (
-                              <Chip label={`${sla.hours}h elapsed`} size="small" color="error" variant="outlined" />
-                            ) : (
-                              <Typography variant="caption" sx={{ color: sla.remaining < 12 ? '#D97706' : '#10B981', fontWeight: 600 }}>
-                                {sla.remaining}h left
-                              </Typography>
-                            )}
-                          </Box>
-                        ) : <Typography variant="caption" color="text.secondary">—</Typography>}
-                      </TableCell>
-                      <TableCell>
+                          sla.breached ? (
+                            <Chip label={`${sla.hours}h elapsed`} size="small" color="error" variant="outlined" />
+                          ) : (
+                            <Typography variant="caption" sx={{ color: sla.remaining < 12 ? '#D97706' : '#10B981', fontWeight: 600 }}>
+                              {sla.remaining}h left
+                            </Typography>
+                          )
+                        ) : <Typography variant="caption" color="text.secondary">Completed</Typography>}
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">Priority</Typography>
                         <Typography variant="caption" sx={{ color: PRIORITY_COLORS[f.priority], fontWeight: 600, textTransform: 'capitalize' }}>
                           {f.priority}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(f.created_at).toLocaleDateString('en-IN')}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <ArrowForward fontSize="small" sx={{ color: '#94A3B8' }} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Card>
+                      </Box>
+                    </Stack>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Filed on {new Date(f.created_at).toLocaleDateString('en-IN')}
+                      </Typography>
+                      <Button size="small" endIcon={<ArrowForward />} sx={{ color: NAVY }}>View</Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
       )}
     </Box>
   );
