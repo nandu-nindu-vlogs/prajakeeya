@@ -5,6 +5,8 @@ server/node_modules/
 # SQLite DB — regenerated from seed on every deploy
 server/prajakeeya.db
 server/*.db
+# ignore sqlite write-ahead log and shm files
+server/*.db*
 
 # Build output (Render builds it)
 client/dist/
