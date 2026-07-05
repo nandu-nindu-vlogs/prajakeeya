@@ -100,6 +100,7 @@ function CertificateView({ data, meta, cert }) {
 
 export default function Documents() {
   const { user } = useAuth();
+  const uid = user?.id || 'anon';
   const [docTypes, setDocTypes] = useState([]);
   const [myDocs, setMyDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +109,33 @@ export default function Documents() {
   const [viewDoc, setViewDoc] = useState(null);
   const [msg, setMsg] = useState(null);
   const [formData, setFormData] = useState({});
+  // Demo verification state for income certificate
+  const lockKey = `demo_income_lock_${uid}`;
+  const attemptsKey = `demo_income_attempts_${uid}`;
+  const [incomeStep, setIncomeStep] = useState(0); // 0 = enter, 1 = fetching, 2 = result
+  const [pan, setPan] = useState('');
+  const [job, setJob] = useState('');
+  const [declaredIncomeInput, setDeclaredIncomeInput] = useState('');
+  const [foundBanks, setFoundBanks] = useState(0);
+  const [inferredIncome, setInferredIncome] = useState(null);
+  const [verifyingPan, setVerifyingPan] = useState(false);
+  const [attempts, setAttempts] = useState(Number(localStorage.getItem(attemptsKey) || 0));
+  const [lockUntil, setLockUntil] = useState(Number(localStorage.getItem(lockKey) || 0));
+
+  useEffect(() => {
+    // Tick lock timer
+    let t;
+    if (lockUntil && lockUntil > Date.now()) {
+      t = setInterval(() => setLockUntil(Number(localStorage.getItem(lockKey) || 0)), 1000);
+    } else if (lockUntil && lockUntil <= Date.now()) {
+      // clear lock
+      localStorage.removeItem(lockKey);
+      localStorage.removeItem(attemptsKey);
+      setAttempts(0);
+      setLockUntil(0);
+    }
+    return () => clearInterval(t);
+  }, [lockUntil]);
 
   const load = () => {
     Promise.all([getAvailableDocTypes(), getMyDocuments()])
@@ -116,8 +144,78 @@ export default function Documents() {
       .finally(() => setLoading(false));
   };
   useEffect(load, []);
+  useEffect(() => {
+    // reset income demo flow when dialog opens/closes
+    if (!dialog || dialog?.key !== 'income') {
+      setIncomeStep(0); setPan(''); setJob(''); setDeclaredIncomeInput(''); setFoundBanks(0); setInferredIncome(null); setVerifyingPan(false);
+    } else {
+      // load attempts/lock
+      setAttempts(Number(localStorage.getItem(attemptsKey) || 0));
+      setLockUntil(Number(localStorage.getItem(lockKey) || 0));
+    }
+  }, [dialog]);
+
+  const verifyPan = () => {
+    if (!pan) { setMsg({ type: 'error', text: 'Please enter PAN number' }); return; }
+    if (lockUntil && lockUntil > Date.now()) { setMsg({ type: 'error', text: 'Income generation is locked. Please wait.' }); return; }
+    setVerifyingPan(true); setIncomeStep(1);
+    // simulate fetching PAN info
+    setTimeout(() => {
+      setFoundBanks(3);
+      // demo inferred income (for verification) — instruct user to enter 600000 for demo
+      setInferredIncome(600000);
+      setDeclaredIncomeInput(formData.declared_income || '');
+      setIncomeStep(2);
+      setVerifyingPan(false);
+    }, 1500);
+  };
+
+  const incrementAttempt = () => {
+    const next = attempts + 1;
+    setAttempts(next);
+    localStorage.setItem(attemptsKey, String(next));
+    if (next >= 3) {
+      const until = Date.now() + 5 * 60 * 1000; // 5 minutes
+      localStorage.setItem(lockKey, String(until));
+      setLockUntil(until);
+      setMsg({ type: 'error', text: 'Your profile has been flagged for verification. Income certificate generation disabled for 5 minutes.' });
+    } else {
+      setMsg({ type: 'warning', text: `Amount mismatch. Please try again (${next}/3 attempts). For demo, enter 600000 as income.` });
+    }
+  };
 
   const handleGenerate = async () => {
+    // Special handling for income certificate demo flow
+    if (dialog?.key === 'income') {
+      // If locked, prevent
+      if (lockUntil && lockUntil > Date.now()) {
+        setMsg({ type: 'error', text: `Your profile is flagged. Please wait ${Math.ceil((lockUntil - Date.now())/1000)}s before retrying.` });
+        return;
+      }
+      // if we haven't verified in this flow, prompt user to run verification
+      if (incomeStep !== 2 || Number(declaredIncomeInput) !== Number(inferredIncome)) {
+        setMsg({ type: 'warning', text: 'Please verify PAN and income before generating. Use the Verify button in the dialog.' });
+        return;
+      }
+      // attach declared_income from verified input
+      setGenerating(true);
+      try {
+        const res = await generateDocument({ doc_type: dialog.key, declared_income: declaredIncomeInput });
+        setMsg({ type: 'success', text: `✅ ${res.data.message}` });
+        setDialog(null);
+        setFormData({});
+        // reset demo attempts on success
+        localStorage.removeItem(attemptsKey);
+        setAttempts(0);
+        load();
+      } catch (err) {
+        const e = err.response?.data;
+        setMsg({ type: 'error', text: e?.error || 'Generation failed' });
+      } finally { setGenerating(false); }
+      return;
+    }
+
+    // default flow for other docs
     setGenerating(true);
     try {
       const res = await generateDocument({ doc_type: dialog.key, ...formData });
@@ -291,9 +389,57 @@ export default function Documents() {
           </Alert>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {dialog?.key === 'income' && (
-              <TextField label="Declared Annual Income (₹)" type="number"
-                onChange={e => setFormData(p => ({ ...p, declared_income: e.target.value }))}
-                helperText="Enter your approximate annual household income" />
+              <Box>
+                {lockUntil && lockUntil > Date.now() ? (
+                  <Alert severity="error">Your profile is flagged. Income certificate generation disabled for {Math.ceil((lockUntil - Date.now())/1000)}s.</Alert>
+                ) : (
+                  <>
+                    {incomeStep === 0 && (
+                      <Stack spacing={2}>
+                        <TextField label="PAN Number" value={pan} onChange={e => setPan(e.target.value)} placeholder="ABCDE1234F" />
+                        <TextField label="Occupation / Job" value={job} onChange={e => setJob(e.target.value)} placeholder="e.g., Farmer, Teacher" />
+                        <TextField label="Declared Annual Income (₹)" type="number" value={declaredIncomeInput}
+                          onChange={e => { setDeclaredIncomeInput(e.target.value); setFormData(p => ({ ...p, declared_income: e.target.value })); }}
+                          helperText="For demo verification, enter 600000" />
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button variant="outlined" onClick={verifyPan} startIcon={verifyingPan ? <CircularProgress size={14} /> : <Bolt />}>Verify PAN & Income</Button>
+                          <Button onClick={() => { setDialog(null); }}>Cancel</Button>
+                        </Box>
+                      </Stack>
+                    )}
+
+                    {incomeStep === 1 && (
+                      <Box sx={{ textAlign: 'center', py: 3 }}>
+                        <CircularProgress />
+                        <Typography variant="body2" sx={{ mt: 2 }}>Fetching PAN information and bank records…</Typography>
+                      </Box>
+                    )}
+
+                    {incomeStep === 2 && (
+                      <Stack spacing={2}>
+                        <Alert severity="info">Found {foundBanks} linked bank accounts. Bank-reported annual income: ₹{inferredIncome}</Alert>
+                        <TextField label="Declared Annual Income (₹)" type="number" value={declaredIncomeInput}
+                          onChange={e => setDeclaredIncomeInput(e.target.value)} helperText="Update declared income if it doesn't match bank data" />
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button variant="contained" onClick={() => {
+                            // check match (demo expects 600000)
+                            if (Number(declaredIncomeInput) === Number(inferredIncome)) {
+                              // mark formData and allow generation
+                              setFormData(p => ({ ...p, declared_income: declaredIncomeInput, pan_number: pan, job }));
+                              setMsg({ type: 'success', text: 'Income verified for demo. You can now generate the certificate.' });
+                              // keep incomeStep=2
+                            } else {
+                              incrementAttempt();
+                            }
+                          }} startIcon={<CheckCircle />}>Confirm & Proceed</Button>
+                          <Button onClick={() => { setIncomeStep(0); }}>Edit</Button>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">Demo hint: enter <strong>600000</strong> as income for successful demo verification.</Typography>
+                      </Stack>
+                    )}
+                  </>
+                )}
+              </Box>
             )}
             {dialog?.key === 'caste' && (
               <FormControl fullWidth>
