@@ -25,6 +25,15 @@ const STATUS_CONFIG = {
   cancelled: { label:'Cancelled',  color:'#6B7280', icon:<Cancel fontSize="small" /> },
 };
 
+// Demo projects used as fallbacks for richer UI previews
+const DEMO_PROJECTS = [
+  { id: -1, title: 'Demo Road Repair - Jayanagar', description: 'Road resurfacing and drainage repair in Jayanagar ward.', category: 'Road Infrastructure', status: 'ongoing', completion_pct: 10, budget: 500000, actual_cost: 50000, location: 'Jayanagar, Bengaluru', contractor_name: 'Rajesh Constructions Pvt Ltd' },
+  { id: -2, title: 'Demo PHC - Yelahanka', description: 'Primary Health Center construction with OPD and lab.', category: 'Healthcare Infrastructure', status: 'completed', completion_pct: 100, budget: 1200000, actual_cost: 1180000, location: 'Yelahanka', contractor_name: 'BuildRight Infra Solutions' },
+  { id: -3, title: 'Demo Smart Meters - North Zone', description: 'Installation of 5000 IoT water meters.', category: 'Water Infrastructure', status: 'ongoing', completion_pct: 20, budget: 450000, actual_cost: 85000, location: 'Bengaluru North Zone', contractor_name: 'AquaTech Water Solutions' },
+  { id: -4, title: 'Demo School Building - Kolar', description: 'New government high school with smart classrooms.', category: 'Education Infrastructure', status: 'delayed', completion_pct: 25, budget: 1800000, actual_cost: 450000, location: 'Kolar Town', contractor_name: 'BuildRight Infra Solutions' },
+  { id: -5, title: 'Demo Rural Roads - Tumkur', description: 'Connectivity works for 8 villages, all-weather roads.', category: 'Road Infrastructure', status: 'planning', completion_pct: 0, budget: 620000, actual_cost: 0, location: 'Tumkur District', contractor_name: 'Rajesh Constructions Pvt Ltd' },
+];
+
 function StatCard({ label, value, sublabel, color, icon }) {
   return (
     <Card>
@@ -134,7 +143,25 @@ function ProjectDetailDialog({ project, open, onClose }) {
   useEffect(() => {
     if (!open || !project) return;
     setLoading(true);
-    getProjectDetail(project.id).then(r => { setDetail(r.data); setLoading(false); }).catch(() => setLoading(false));
+    getProjectDetail(project.id).then(r => {
+      const fetched = r.data || {};
+      // provide demo updates/objections when none exist for better UX
+      if ((!fetched.updates || fetched.updates.length === 0) && project.id < 0) {
+        fetched.updates = [
+          { id: -201, actor_name: 'Rajesh Constructions', actor_role: 'contractor', update_type: 'milestone', description: 'Site survey and clearing complete.', created_at: '2026-04-10', completion_pct: 5 },
+          { id: -202, actor_name: 'Rajesh Constructions', actor_role: 'contractor', update_type: 'progress', description: 'GSB layer laid for first 6km.', created_at: '2026-05-02', completion_pct: 15 },
+          { id: -203, actor_name: 'Officer Nagaraj', actor_role: 'officer', update_type: 'progress', description: 'DBM application started at km 0-4.', created_at: '2026-06-20', completion_pct: project.completion_pct },
+        ];
+      }
+      if ((!fetched.objections || fetched.objections.length === 0) && project.id < 0) {
+        fetched.objections = [
+          { id: -301, citizen_name: 'Priya Sharma', subject: 'Dust nuisance during works', description: 'Heavy dust near residences; request water sprinkling.', category: 'objection', status: 'open', created_at: '2026-06-12' },
+          { id: -302, citizen_name: 'Ravi Kumar', subject: 'Traffic diversion plan unclear', description: 'Please display diversion maps.', category: 'query', status: 'answered', response: 'Diversion maps uploaded on site.', responded_at: '2026-06-18' },
+        ];
+      }
+      setDetail(fetched);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [open, project?.id]);
 
   const handleSubmitObjection = async () => {
@@ -377,7 +404,10 @@ export default function Projects() {
       getProjects({ status: filterStatus || undefined, category: filterCategory || undefined }),
       getProjectStats()
     ]).then(([pr, sr]) => {
-      setProjects(pr.data);
+      // use API projects; if too few, merge demo projects for better preview
+      const apiProjects = pr.data || [];
+      const projectsToShow = apiProjects.length >= 5 ? apiProjects : [...apiProjects, ...DEMO_PROJECTS.filter(d => !apiProjects.find(p => p.id === d.id))].slice(0,6);
+      setProjects(projectsToShow);
       setStats(sr.data);
       setLoading(false);
     }).catch(() => setLoading(false));
