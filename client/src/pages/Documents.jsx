@@ -458,7 +458,19 @@ export default function Documents() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button onClick={() => setDialog(null)}>Cancel</Button>
-          <Button variant="contained" onClick={handleGenerate} disabled={generating}
+          <Button
+            variant="contained"
+            onClick={handleGenerate}
+            disabled={(() => {
+              if (generating) return true;
+              if (dialog?.key === 'income') {
+                // disabled while locked or not verified (incomeStep must be 2 and amount must match inferred)
+                if (lockUntil && lockUntil > Date.now()) return true;
+                if (incomeStep !== 2) return true;
+                if (Number(declaredIncomeInput) !== Number(inferredIncome)) return true;
+              }
+              return false;
+            })()}
             startIcon={generating ? <CircularProgress size={16} /> : <Bolt />}
             sx={{ bgcolor: '#10B981', '&:hover': { bgcolor: '#059669' } }}>
             {generating ? 'Generating...' : 'Generate Instantly'}
