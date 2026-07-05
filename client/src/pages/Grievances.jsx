@@ -40,6 +40,17 @@ export default function Grievances() {
   };
   useEffect(load, []);
 
+  // Demo fallback data (shown when API returns empty)
+  const demoGrievances = [
+    { id: -1, ticket_id: 'GRV-DEMO-101', subject: 'Street light outage - Demo', citizen_name: 'Ravi Kumar', category: 'service', priority: 'high', status: 'open', sla_hours: 72, created_at: '2026-06-10' },
+    { id: -2, ticket_id: 'GRV-DEMO-102', subject: 'Water contamination - Demo', citizen_name: 'Priya Sharma', category: 'service', priority: 'critical', status: 'in_progress', sla_hours: 72, created_at: '2026-06-12' },
+    { id: -3, ticket_id: 'GRV-DEMO-103', subject: 'Pothole causing accidents - Demo', citizen_name: 'Suresh Patil', category: 'service', priority: 'high', status: 'resolved', sla_hours: 72, created_at: '2026-06-05' },
+    { id: -4, ticket_id: 'GRV-DEMO-104', subject: 'Teacher absent — Demo', citizen_name: 'Ravi Kumar', category: 'service', priority: 'medium', status: 'closed', sla_hours: 72, created_at: '2026-06-15' },
+    { id: -5, ticket_id: 'GRV-DEMO-105', subject: 'Request: Online slot booking - Demo', citizen_name: 'Priya Sharma', category: 'other', priority: 'low', status: 'open', sla_hours: 72, created_at: '2026-06-18' },
+  ];
+
+  const displayedGrievances = grievances.length > 0 ? grievances : demoGrievances;
+
   const handleSubmit = async () => {
     if (!form.subject || !form.description) return;
     setSubmitting(true);
@@ -54,8 +65,8 @@ export default function Grievances() {
     } finally { setSubmitting(false); }
   };
 
-  const pending = grievances.filter(g => ['open','in_progress','escalated'].includes(g.status)).length;
-  const resolved = grievances.filter(g => g.status === 'resolved').length;
+  const pending = displayedGrievances.filter(g => ['open','in_progress','escalated'].includes(g.status)).length;
+  const resolved = displayedGrievances.filter(g => g.status === 'resolved').length;
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: 'auto' }}>
@@ -99,7 +110,7 @@ export default function Grievances() {
 
       {loading ? (
         <Box sx={{ textAlign: 'center', py: 8 }}><CircularProgress /></Box>
-      ) : grievances.length === 0 ? (
+      ) : displayedGrievances.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Campaign sx={{ fontSize: 56, color: '#CBD5E1', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">No grievances found</Typography>
@@ -125,7 +136,7 @@ export default function Grievances() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {grievances.map(g => {
+                {displayedGrievances.map(g => {
                   const sc = STATUS_MAP[g.status] || STATUS_MAP.open;
                   const hoursElapsed = (Date.now() - new Date(g.created_at).getTime()) / 3600000;
                   const slaBreached = hoursElapsed > g.sla_hours && !['resolved','closed'].includes(g.status);
@@ -157,9 +168,14 @@ export default function Grievances() {
                         {slaBreached ? (
                           <Chip label="SLA BREACHED" size="small" color="error" icon={<Warning sx={{ fontSize: 12 }} />} />
                         ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            {Math.round(Math.max(0, g.sla_hours - hoursElapsed))}h left
-                          </Typography>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {Math.round(Math.max(0, g.sla_hours - hoursElapsed))}h left
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#0891B2', display: 'block' }}>
+                              Expected resolution window
+                            </Typography>
+                          </Box>
                         )}
                       </TableCell>
                       <TableCell>

@@ -85,7 +85,8 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [open, setOpen] = useState(true);
+  // Start collapsed by default to improve mobile initial view
+  const [open, setOpen] = useState(false);
 
   const navItems = NAV[user?.role] || NAV.citizen;
   const roleColor = ROLE_COLORS[user?.role] || NAVY;

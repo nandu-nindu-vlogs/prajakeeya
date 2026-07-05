@@ -10,15 +10,54 @@ async function seed() {
 
   // ── Full seed: only runs on completely empty DB ────────────────────────────
   const existing = db.prepare('SELECT COUNT(*) as c FROM users').get();
-  if (existing.c > 3) return; // already fully seeded (3 = only contractors were patched into empty DB... actually >3 means full seed already ran)
+  if (existing.c > 3) {
+    // DB already has multiple users — still ensure key demo datasets exist
+    console.log('[SEED] DB already seeded — ensuring demo datasets exist');
+    await ensureDemoData(db);
+    return;
+  }
 
   // Wait — if we just patched contractors into an otherwise-full DB, we should stop here.
   // Only do full seed when DB was truly empty before patching.
   const nonContractor = db.prepare("SELECT COUNT(*) as c FROM users WHERE role != 'contractor'").get();
-  if (nonContractor.c > 0) return; // full seed already ran earlier
+  if (nonContractor.c > 0) {
+    console.log('[SEED] Partial DB detected — ensuring demo datasets exist');
+    await ensureDemoData(db);
+    return;
+  }
 
   console.log('[SEED] Fresh DB — running full seed...');
   await fullSeed(db);
+}
+
+// Ensure demo datasets exist even on partially seeded DBs
+async function ensureDemoData(db) {
+  // Insert a few public projects, grievances, files and docs if missing
+  const cntProjects = db.prepare('SELECT COUNT(*) as c FROM projects').get().c;
+  if (cntProjects === 0) {
+    db.prepare(`INSERT INTO projects (title,description,dept_id,contractor_name,budget,status,completion_pct,is_public,location,category)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`).run('Demo Road Repair - Sample', 'Demo: short description', 2, 'Rajesh Constructions Pvt Ltd', 500000, 'ongoing', 10, 1, 'Demo Location', 'Road Works');
+  }
+
+  const cntFiles = db.prepare('SELECT COUNT(*) as c FROM files').get().c;
+  if (cntFiles === 0) {
+    db.prepare('INSERT INTO files (title,category,status,citizen_id,dept_id,sla_hours,priority,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('Demo: Water Connection Application','utility_connection','submitted',1,6,72,'normal','2026-06-01','2026-06-01');
+  }
+
+  const cntGr = db.prepare('SELECT COUNT(*) as c FROM grievances').get().c;
+  if (cntGr === 0) {
+    db.prepare('INSERT INTO grievances (ticket_id,citizen_id,dept_id,subject,description,category,status,priority,sla_hours,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .run('GRV-DEMO-001',1,2,'Demo grievance: street light','Demo description for grievance','service','open','medium',72,'2026-06-10');
+  }
+
+  const cntDocs = db.prepare('SELECT COUNT(*) as c FROM generated_documents').get().c;
+  if (cntDocs === 0) {
+    db.prepare('INSERT INTO generated_documents (citizen_id,doc_type,cert_number,citizen_name,citizen_aadhaar,data_json,status,valid_until) VALUES (?,?,?,?,?,?,?,?)')
+      .run(1,'income','DEMO-INC-001','Demo User','0000-0000-0000',JSON.stringify({annual_income:100000}), 'active', new Date(Date.now()+365*24*3600*1000).toISOString());
+  }
+
+  console.log('[SEED] Ensured minimal demo datasets exist');
 }
 
 async function patchContractors(db) {
